@@ -1,0 +1,187 @@
+public class UploadUtil {
+    private static UploadUtil   uploadUtil;
+    private static final String BOUNDARY     = UUID.randomUUID().toString(); 
+    private static final String PREFIX       = "--";
+    private static final String LINE_END     = "\r\n";
+    private static final String CONTENT_TYPE = "multipart/form-data";        
+
+    private static String       result       = null;
+
+    private UploadUtil() {
+
+    }
+
+    public static UploadUtil getInstance() {
+        result = null;
+        if (null == uploadUtil) {
+            uploadUtil = new UploadUtil();
+        }
+        return uploadUtil;
+    }
+
+    private int                 readTimeOut    = 10 * 1000; 
+    private int                 connectTimeout = 10 * 1000; 
+
+    private static int          requestTime    = 0;
+
+    private static final String CHARSET        = "utf-8";   
+
+
+    public String uploadFile2ImageServer(String file, HttpServletRequest request,
+                                         Map<String, String> param, String path) {
+        return uploadFile2ImageServer(file, request, null, null, param, path);
+    }
+
+    /**
+     * @param file
+     * @param request
+     * @param width
+     * @param height
+     * @param params
+     * @return
+     */
+    public String uploadFile2ImageServer(String file, HttpServletRequest request, String width,
+                                         String height, Map<String, String> params, String path) {
+        if (width != null && height != null) {
+            params.put("pic_width", width);
+            params.put("pic_height", height);
+        }
+        uploadFile(getTempFile(request, file), "pic", path, params);
+        if (result != null && !"".equals(result)) {
+            return result.replaceAll("\\\\", "/");
+        }
+        return null;
+
+    }
+
+    public Map<String, Object> uploadFile2LocServer(HttpServletRequest request, String formFile,
+                                                    String savePath) {
+
+        MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
+        CommonsMultipartFile file = (CommonsMultipartFile) multipartRequest.getFile(formFile);
+
+        String extend = file.getOriginalFilename()
+            .substring(file.getOriginalFilename().lastIndexOf(".") + 1).toLowerCase();
+
+        String saveFilePath = request.getServletContext().getRealPath("/") + savePath;
+
+        saveFilePath = saveFilePath.replaceAll("\\\\", "/");
+
+        Map<String, Object> map = new HashMap<String, Object>();
+        try {
+            String saveFileName = UUID.randomUUID().toString() + "." + extend;
+
+            if ((file != null) && (!file.isEmpty())) {
+                float fileSize = Float.valueOf(file.getSize()).floatValue();
+
+                File path = new File(saveFilePath);
+                if (!path.exists()) {
+                    path.mkdirs();
+                }
+                saveFile2Loca(file, saveFilePath, saveFileName);
+
+                if (isImg(extend)) {
+                    File img = new File(saveFilePath + "/" + saveFileName);
+                    BufferedImage bis = ImageIO.read(img);
+                    int w = bis.getWidth();
+                    int h = bis.getHeight();
+                    map.put("width", Integer.valueOf(w));
+                    map.put("height", Integer.valueOf(h));
+                }
+                map.put("mime", extend);
+                map.put("fileName", saveFileName);
+                map.put("fileSize", Float.valueOf(fileSize));
+                map.put("oldName", file.getOriginalFilename());
+                map.put("fileAbsolutePath", saveFilePath + "/" + saveFileName);
+                map.put("filePath", savePath + "/" + saveFileName);
+            } else {
+                map.put("width", Integer.valueOf(0));
+                map.put("height", Integer.valueOf(0));
+                map.put("mime", "");
+                map.put("fileName", "");
+                map.put("fileSize", Float.valueOf(0.0F));
+                map.put("oldName", "");
+                map.put("fileAbsolutePath", "");
+                map.put("filePath", "");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return map;
+    }
+
+
+    private void saveFile2Loca(CommonsMultipartFile file, String saveFilePath,
+                               String saveFileName) {
+        InputStream is = null;
+        DataOutputStream out = null;
+        try {
+            out = new DataOutputStream(
+                new FileOutputStream(saveFilePath + File.separator + saveFileName));
+            is = file.getInputStream();
+            int size = Integer.valueOf((int) file.getSize());
+            byte[] buffer = new byte[size];
+            while (is.read(buffer) > 0) {
+                out.write(buffer);
+            }
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public static boolean isImg(String extend) {
+        List<String> list = new ArrayList<String>();
+        list.add("jpg");
+        list.add("jpeg");
+        list.add("bmp");
+        list.add("gif");
+        list.add("png");
+        list.add("tif");
+        return list.contains(extend);
+    }  
+
+
+    public int getReadTimeOut() {
+        return readTimeOut;
+    }
+
+    public void setReadTimeOut(int readTimeOut) {
+        this.readTimeOut = readTimeOut;
+    }
+
+    public int getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * @return
+     */
+    public static int getRequestTime() {
+        return requestTime;
+    }
+
+    public String getResult() {
+        return result;
+    }
+
+}
