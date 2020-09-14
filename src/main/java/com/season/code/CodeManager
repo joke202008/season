@@ -1,0 +1,90 @@
+public class CodeManager {
+
+    private static Logger log = LoggerFactory.getLogger(CodeManager.class);
+
+    private static ICodeService codeService;
+
+    public static ICodeService getCodeService() {
+        return codeService;
+    }
+
+    @Autowired
+    public void setCodeService(ICodeService codeService) {
+        CodeManager.codeService = codeService;
+    }
+
+    public static Map<String, List<Code>> codeMap;
+
+    public static Map<String, List<Code>> getCodeMap() {
+        return codeMap;
+    }
+
+    public void setCodeMap(Map<String, List<Code>> codeMap) {
+        CodeManager.codeMap = codeMap;
+    }
+
+    @PostConstruct     
+    public static void init() {
+        Map<String, String> map = new HashMap<String, String>();
+        map.put("q_useYn", ConstantsEJS.USE_YN_Y + "");
+        FeignUtil feignUtil = FeignUtil.getFeignUtil(map, null);
+        ServiceResult<List<Code>> serviceResult = codeService.getCodes(feignUtil);
+        if (!serviceResult.getSuccess()) {
+            throw new RuntimeException(serviceResult.getMessage());
+        }
+        codeMap = new HashMap<String, List<Code>>();
+        List<Code> divList = new ArrayList<Code>();
+        for (Code code : serviceResult.getResult()) {
+            divList = codeMap.get(code.getCodeDiv());
+            if (divList == null) {
+                divList = new ArrayList<Code>();
+            }
+            divList.add(code);
+            codeMap.put(code.getCodeDiv(), divList);
+        }
+    }
+
+    public static List<Code> getCodes(String codeDiv) {
+        return codeMap.get(codeDiv);
+    }
+
+    public static String getCodesJsonByDivs(Object[] codeDivs) {
+        Map<String, Map<String, String>> divMap = new HashMap<String, Map<String, String>>();
+        Map<String, String> cdMap = new HashMap<String, String>();
+        List<Code> lstCodes = new ArrayList<Code>();
+        for (Object codeDiv : codeDivs) {
+            lstCodes = codeMap.get(codeDiv.toString());
+            if (lstCodes != null) {
+                cdMap = new HashMap<String, String>();
+                for (Code code : lstCodes) {
+                    cdMap.put(code.getCodeCd(), code.getCodeText());
+                }
+                divMap.put(codeDiv.toString(), cdMap);
+            }
+        }
+        return JSON.toJSONString(divMap);
+    }
+
+    public static String getCodeText(String codeDiv, String codeCd) {
+        String codeText = "";
+        List<Code> codes = codeMap.get(codeDiv);
+        for (Code code : codes) {
+            if (code.getCodeCd().equals(codeCd)) {
+                codeText = code.getCodeText();
+                break;
+            }
+        }
+        return codeText;
+    }
+
+    public static List<Code> getFilterCodes(String codeDiv, List<String> excludeCodeCDs) {
+        List<Code> codes = codeMap.get(codeDiv);
+        for (Code code : codes) {
+            if (excludeCodeCDs.contains(code.getCodeCd())) {
+                codes.remove(code);
+            }
+        }
+        return codes;
+    }
+
+}
